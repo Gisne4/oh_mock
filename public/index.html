@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>OMOK LIVE - GSAP & Anime.js 인터랙티브 오목</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>OMOK LIVE - 반응형 멀티 인터랙티브 오목</title>
   <!-- GSAP & Anime.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
@@ -20,18 +20,26 @@
       --text-main: #f3f4f6;
       --text-sub: #9ca3af;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
     html, body {
       width: 100vw;
       height: 100vh;
+      height: 100dvh; /* 모바일 주소창/하단바를 제외한 실제 뷰포트 높이 */
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-main);
+      word-break: keep-all; /* 한글 단어 중간 세로 쪼개짐 방지 */
     }
 
     /* ==========================================
-       1. #playerCursors & 레이어 간섭이 완전히 해결된 커서/닉네임/GIF 구조
+       1. #playerCursors & 커서/닉네임/GIF 레이어
        ========================================== */
     .player-cursors-container {
       position: fixed;
@@ -59,7 +67,6 @@
       filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.75));
       flex-shrink: 0;
     }
-    /* 타인 커서 옆 미니 아이디 캡슐 (커서 우측 하단 +18px 위치) */
     .mini-cursor-id {
       margin-left: 2px;
       margin-top: 18px;
@@ -81,7 +88,7 @@
       box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
     }
 
-    /* 내 마우스 우측 하단(+16px, +20px)에 떠다니는 내 미니 아이디 캡슐 (GIF보다 아래 레이어) */
+    /* 내 마우스/터치 우측 하단 미니 아이디 캡슐 */
     .local-cursor-follower {
       position: fixed;
       top: 0;
@@ -105,6 +112,7 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      white-space: nowrap;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.65);
     }
     .local-digit-box {
@@ -116,6 +124,7 @@
       color: #fff;
       font-size: 0.74rem;
       font-weight: 900;
+      white-space: nowrap;
       box-shadow: 0 4px 14px rgba(99, 102, 241, 0.6);
     }
     .digit-progress-bar {
@@ -132,26 +141,25 @@
       background: #fde047;
     }
 
-    /* [디버깅 완료] 커서 우측 상단(+18px, -118px)에 완전히 분리되어 떠다니는 무손실 GIF */
+    /* 커서 우측 상단 플로팅 GIF */
     .cursor-gif-float {
       position: fixed;
       top: 0;
       left: 0;
-      width: 112px;
-      height: 112px;
+      width: 108px;
+      height: 108px;
       pointer-events: none;
-      z-index: 82; /* 닉네임 캡슐(68)보다 항상 위에 위치하고 좌표도 분리됨 */
+      z-index: 82;
       will-change: transform;
     }
     .cursor-gif-card {
       width: 100%;
       height: 100%;
-      /* 마우스 포인터의 우측 상단으로 띄워 우측 하단의 닉네임 캡슐과 절대 겹치지 않게 설계 */
-      margin-left: 18px;
-      margin-top: -116px;
+      margin-left: 14px;
+      margin-top: -112px;
       border-radius: 16px;
       overflow: hidden;
-      background: rgba(15, 18, 26, 0.78);
+      background: rgba(15, 18, 26, 0.82);
       backdrop-filter: blur(6px);
       border: 2px solid rgba(255, 255, 255, 0.5);
       box-shadow: 0 14px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(99, 102, 241, 0.35);
@@ -163,13 +171,10 @@
     .cursor-gif-card img {
       width: 100%;
       height: 100%;
-      /* cover 대신 contain을 사용하여 집게, 망치, 현상수배서, 유희왕 카드가 잘리지 않고 100% 다 보임 */
       object-fit: contain;
       display: block;
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
     }
 
-    /* Anime.js 파티클 & 클릭 파동 요소 */
     .anime-ripple {
       position: fixed;
       border-radius: 50%;
@@ -187,7 +192,7 @@
     }
 
     /* ==========================================
-       2. VS 매치업 스플래시, 턴 배너, 설명서 모달
+       2. VS 스플래시, 토스트, 튜토리얼 모달
        ========================================== */
     .vs-splash-overlay {
       position: fixed;
@@ -197,21 +202,23 @@
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(0, 0, 0, 0.5);
       backdrop-filter: blur(4px);
+      padding: 1rem;
     }
     .vs-splash-card {
       background: linear-gradient(135deg, #1e1b4b, #0f172a);
       border: 2px solid #818cf8;
-      border-radius: 24px;
-      padding: 1.5rem 3rem;
+      border-radius: 22px;
+      padding: 1.4rem 2.4rem;
       display: flex;
       align-items: center;
-      gap: 1.8rem;
+      gap: 1.5rem;
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+      max-width: 92vw;
     }
     .vs-badge {
-      font-size: 2rem;
+      font-size: 1.8rem;
       font-weight: 900;
       color: #fde047;
       text-shadow: 0 0 18px rgba(250, 204, 21, 0.8);
@@ -219,18 +226,22 @@
 
     .toast-alert {
       position: fixed;
-      bottom: 102px;
+      bottom: 96px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(16, 185, 129, 0.95);
+      background: rgba(16, 185, 129, 0.96);
       color: #fff;
       font-weight: 800;
-      font-size: 0.88rem;
+      font-size: 0.85rem;
       padding: 0.55rem 1.2rem;
       border-radius: 99px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
       z-index: 250;
       display: none;
+      white-space: nowrap;
+      max-width: 92vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .turn-slide-banner {
       position: fixed;
@@ -241,62 +252,93 @@
       border: 2px solid #a7f3d0;
       color: #fff;
       font-weight: 900;
-      font-size: 0.95rem;
-      padding: 0.5rem 1.4rem;
+      font-size: 0.9rem;
+      padding: 0.45rem 1.2rem;
       border-radius: 99px;
       box-shadow: 0 10px 25px rgba(16, 185, 129, 0.5);
       z-index: 85;
       opacity: 0;
       pointer-events: none;
+      white-space: nowrap;
     }
+
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.78);
+      background: rgba(0, 0, 0, 0.82);
       backdrop-filter: blur(8px);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 200;
-      padding: 1rem;
+      padding: 0.9rem;
     }
     .tutorial-modal {
       width: 100%;
       max-width: 780px;
+      max-height: 88dvh;
       background: var(--panel-bg);
       border: 1px solid #3b4259;
       border-radius: 20px;
-      padding: 2rem;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
-      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+    }
+    .tuto-modal-header {
+      padding: 1.2rem 1.5rem;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+      flex-shrink: 0;
+      background: var(--panel-bg);
+    }
+    .tuto-modal-body {
+      padding: 1.2rem 1.5rem;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+    }
+    .tuto-modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: flex-end;
+      flex-shrink: 0;
+      background: var(--panel-bg);
     }
     .tuto-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.9rem;
-      margin: 1.3rem 0;
     }
     .tuto-card {
       background: var(--bg-dark);
       border: 1px solid var(--panel-border);
       border-radius: 14px;
-      padding: 1.05rem;
+      padding: 1rem;
+      min-width: 0;
+    }
+    .tuto-card.span-full {
+      grid-column: 1 / -1;
     }
     .tuto-card h4 {
-      font-size: 0.96rem;
+      font-size: 0.95rem;
       color: #a5b4fc;
       margin-bottom: 0.45rem;
+      line-height: 1.35;
     }
     .tuto-card p {
       font-size: 0.85rem;
       color: #d1d5db;
-      line-height: 1.5;
+      line-height: 1.55;
     }
     .kbd {
       display: inline-block;
-      padding: 2px 6px;
-      font-size: 0.76rem;
+      padding: 1px 6px;
+      font-size: 0.75rem;
       font-weight: 800;
       color: #fde047;
       background: #272b3a;
@@ -314,46 +356,56 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 1.5rem;
+      padding: 1rem;
+      overflow-y: auto;
     }
     .lobby-card {
       width: 100%;
       max-width: 840px;
+      max-height: 92dvh;
+      display: flex;
+      flex-direction: column;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
       border-radius: 18px;
-      padding: 2rem;
+      padding: 1.6rem;
       box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
     }
     .lobby-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.4rem;
-      padding-bottom: 1rem;
+      gap: 0.8rem;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.9rem;
       border-bottom: 1px solid var(--panel-border);
     }
     .create-row {
       display: grid;
       grid-template-columns: 1fr 1fr 1.3fr auto;
       gap: 0.6rem;
-      margin-bottom: 1.4rem;
+      margin-bottom: 1.2rem;
     }
     input, button {
-      padding: 0.7rem 1rem;
+      padding: 0.7rem 0.95rem;
       border-radius: 8px;
       border: 1px solid var(--panel-border);
       font-size: 0.92rem;
       outline: none;
     }
-    input { background: var(--bg-dark); color: var(--text-main); }
+    input {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      user-select: text;
+    }
     input:focus { border-color: var(--accent); }
     button {
       background: var(--accent);
       color: #fff;
-      font-weight: 600;
+      font-weight: 700;
       border: none;
       cursor: pointer;
+      white-space: nowrap;
       transition: background 0.15s;
     }
     button:hover { background: var(--accent-hover); }
@@ -365,36 +417,51 @@
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
-      max-height: 320px;
       overflow-y: auto;
+      flex: 1;
+      min-height: 140px;
     }
     .room-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 0.8rem;
       background: var(--bg-dark);
-      padding: 0.9rem 1.2rem;
+      padding: 0.85rem 1rem;
       border-radius: 10px;
       border: 1px solid var(--panel-border);
     }
+    .room-item-info {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+    .room-item-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
     .badge {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.6rem;
+      font-size: 0.74rem;
+      padding: 0.22rem 0.55rem;
       border-radius: 99px;
       font-weight: 700;
-      margin-right: 0.6rem;
+      white-space: nowrap;
     }
     .badge-wait { background: rgba(16, 185, 129, 0.2); color: #34d399; }
     .badge-play { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
 
     /* ==========================================
-       4. 인게임 화면 (W/H 반응형 감시 레이아웃)
+       4. 인게임 화면 (PC 기본 레이아웃)
        ========================================== */
     .game-screen {
       display: none;
       position: relative;
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
@@ -402,29 +469,52 @@
     }
     .top-hud {
       width: 100%;
-      height: 62px;
-      background: rgba(21, 24, 34, 0.95);
+      min-height: 60px;
+      background: rgba(21, 24, 34, 0.96);
       border-bottom: 1px solid var(--panel-border);
-      padding: 0 1.1rem;
+      padding: 0.5rem 1rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.6rem;
       z-index: 30;
+      flex-shrink: 0;
     }
     .hud-left, .hud-center, .hud-right {
       display: flex;
       align-items: center;
-      gap: 0.55rem;
+      gap: 0.5rem;
+    }
+    .hud-left { min-width: 0; }
+    .room-title-label {
+      font-size: 0.94rem;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 170px;
+    }
+    .status-label {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #34d399;
+      white-space: nowrap;
+    }
+    .spectator-label {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      white-space: nowrap;
     }
     .player-pill {
       display: flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.35rem 0.8rem;
+      gap: 0.4rem;
+      padding: 0.32rem 0.75rem;
       border-radius: 99px;
       background: var(--bg-dark);
       border: 2px solid transparent;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
+      white-space: nowrap;
     }
     .player-pill.active {
       border-color: var(--success);
@@ -432,13 +522,20 @@
     }
     .timer-pill {
       font-weight: 800;
-      font-size: 0.95rem;
-      padding: 0.35rem 0.75rem;
+      font-size: 0.92rem;
+      padding: 0.32rem 0.7rem;
       border-radius: 8px;
       background: #272b3a;
       color: #34d399;
-      min-width: 66px;
+      min-width: 60px;
       text-align: center;
+      white-space: nowrap;
+    }
+    .hud-btn {
+      padding: 0.4rem 0.65rem;
+      font-size: 0.76rem;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .center-stage {
@@ -449,16 +546,18 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      padding: 6px;
     }
     canvas#boardCanvas {
       background: #dcb35c;
-      border-radius: 12px;
-      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.7);
+      border-radius: 10px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
       display: block;
+      touch-action: none;
       transition: box-shadow 0.3s ease;
     }
     canvas#boardCanvas.low-time-glow {
-      box-shadow: 0 0 35px rgba(239, 68, 68, 0.85), 0 18px 45px rgba(0, 0, 0, 0.7);
+      box-shadow: 0 0 32px rgba(239, 68, 68, 0.85), 0 16px 40px rgba(0, 0, 0, 0.7);
     }
     canvas#laserCanvas {
       position: fixed;
@@ -470,44 +569,46 @@
     /* 콤보 공명 배너 */
     .combo-resonance-banner {
       position: fixed;
-      top: 82px;
+      top: 80px;
       left: 50%;
       transform: translateX(-50%) scale(0);
       background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(99, 102, 241, 0.95));
       border: 2px solid #fde047;
       border-radius: 18px;
-      padding: 0.6rem 1.4rem;
+      padding: 0.55rem 1.2rem;
       display: none;
       align-items: center;
-      gap: 1rem;
+      gap: 0.8rem;
       box-shadow: 0 15px 40px rgba(239, 68, 68, 0.55);
       z-index: 90;
       pointer-events: none;
+      max-width: 92vw;
     }
     .combo-gif-box {
-      width: 68px;
-      height: 68px;
+      width: 56px;
+      height: 56px;
       border-radius: 10px;
       overflow: hidden;
       background: rgba(15, 18, 26, 0.85);
       border: 2px solid #fff;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .combo-gif-box img { width: 100%; height: 100%; object-fit: contain; }
 
-    /* 우측 상단 플로팅 채팅 & Enter 즉시 입력 바 */
+    /* 우측 상단 플로팅 채팅 & 입력 바 */
     .floating-chat-area {
       position: fixed;
-      top: 72px;
-      right: 18px;
-      width: 330px;
-      max-height: 45vh;
+      top: 70px;
+      right: 16px;
+      width: 310px;
+      max-height: 42vh;
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 0.42rem;
+      gap: 0.4rem;
       pointer-events: none;
       z-index: 40;
     }
@@ -515,15 +616,15 @@
       background: rgba(13, 15, 20, 0.86);
       border: 1px solid rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(8px);
-      padding: 0.48rem 0.85rem;
+      padding: 0.44rem 0.8rem;
       border-radius: 12px;
-      font-size: 0.86rem;
+      font-size: 0.84rem;
       color: #fff;
       max-width: 100%;
       word-break: break-word;
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
     }
-    .chat-bubble.system { border-left: 3px solid #fbbf24; color: #fde68a; font-size: 0.8rem; }
+    .chat-bubble.system { border-left: 3px solid #fbbf24; color: #fde68a; font-size: 0.78rem; }
 
     .quick-chat-bar {
       position: fixed;
@@ -531,25 +632,26 @@
       left: 50%;
       transform: translateX(-50%);
       width: 430px;
-      max-width: 90vw;
-      background: rgba(13, 15, 20, 0.96);
+      max-width: 92vw;
+      background: rgba(13, 15, 20, 0.97);
       border: 2px solid var(--accent);
       border-radius: 99px;
-      padding: 0.48rem 1.15rem;
+      padding: 0.42rem 0.75rem 0.42rem 1.1rem;
       display: none;
       align-items: center;
-      gap: 0.6rem;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
-      z-index: 80;
+      gap: 0.5rem;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+      z-index: 95;
     }
     .quick-chat-bar.active { display: flex; }
     .quick-chat-bar input {
       flex: 1;
+      min-width: 0;
       background: transparent;
       border: none;
       color: #fff;
       font-size: 0.95rem;
-      padding: 0.2rem 0;
+      padding: 0.25rem 0;
     }
 
     /* ==========================================
@@ -557,7 +659,7 @@
        ========================================== */
     .dock-hover-preview {
       position: fixed;
-      bottom: 96px;
+      bottom: 94px;
       left: 50%;
       transform: translateX(-50%);
       width: 110px;
@@ -594,22 +696,25 @@
 
     .bottom-emote-dock {
       width: 100%;
-      height: 86px;
-      background: rgba(21, 24, 34, 0.96);
+      height: 84px;
+      background: rgba(21, 24, 34, 0.97);
       border-top: 1px solid var(--panel-border);
-      padding: 0.35rem 0.7rem;
+      padding: 0.35rem 0.6rem;
+      padding-bottom: calc(0.35rem + env(safe-area-inset-bottom));
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: center; /* PC(1200px 이상)에서는 20개 중앙 정렬 */
       gap: 0.38rem;
       z-index: 35;
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-shrink: 0;
     }
     .emote-slot {
       position: relative;
-      width: 62px;
-      height: 70px;
-      min-width: 62px;
+      width: 60px;
+      height: 68px;
+      min-width: 60px;
       background: #10121a;
       border: 1px solid #2b3040;
       border-radius: 10px;
@@ -619,12 +724,13 @@
       justify-content: center;
       cursor: pointer;
       overflow: hidden;
+      flex-shrink: 0;
     }
     .emote-slot-num {
       position: absolute;
       top: 2px;
       left: 4px;
-      font-size: 0.64rem;
+      font-size: 0.62rem;
       font-weight: 800;
       color: #fff;
       background: rgba(99, 102, 241, 0.88);
@@ -633,8 +739,8 @@
       z-index: 2;
     }
     .emote-slot-thumb {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       border-radius: 6px;
       overflow: hidden;
       margin-top: 4px;
@@ -649,27 +755,265 @@
       object-fit: contain;
     }
     .emote-slot-name {
-      font-size: 0.6rem;
+      font-size: 0.58rem;
       color: var(--text-sub);
-      max-width: 56px;
+      max-width: 54px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       margin-top: 2px;
     }
     .gif-fallback {
-      font-size: 0.62rem;
+      font-size: 0.6rem;
       font-weight: 800;
       color: #a5b4fc;
       text-align: center;
-      padding: 4px;
+      padding: 3px;
       line-height: 1.15;
     }
 
-    @media (max-width: 780px) {
-      .tuto-grid { grid-template-columns: 1fr; }
-      .create-row { grid-template-columns: 1fr; }
-      .bottom-emote-dock { justify-content: flex-start; }
+    /* ==========================================================================
+       @MEDIA 1: 태블릿 / 아이패드 (768px ~ 1199px)
+       ========================================================================== */
+    @media (min-width: 768px) and (max-width: 1199px) {
+      .create-row {
+        grid-template-columns: 1fr 1fr;
+      }
+      .top-hud {
+        flex-wrap: wrap;
+        padding: 0.55rem 0.9rem;
+        gap: 0.45rem;
+      }
+      .hud-left {
+        order: 1;
+        flex: 1;
+      }
+      .hud-right {
+        order: 2;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .hud-center {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        padding-top: 0.35rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .bottom-emote-dock {
+        justify-content: flex-start; /* 가로 스크롤 시 1번 항목 잘림 방지 */
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
+      }
+      .floating-chat-area {
+        width: 280px;
+      }
+    }
+
+    /* ==========================================================================
+       @MEDIA 2: 스마트폰 / 모바일 인앱 브라우저 (max-width: 767px)
+       ========================================================================== */
+    @media (max-width: 767px) {
+      /* 튜토리얼 모달 1열 전환 및 버튼 고정 */
+      .tutorial-modal {
+        max-height: 86dvh;
+        border-radius: 16px;
+      }
+      .tuto-modal-header {
+        padding: 0.9rem 1rem;
+      }
+      .tuto-modal-header h2 {
+        font-size: 1.05rem !important;
+      }
+      .tuto-modal-body {
+        padding: 0.9rem 1rem;
+      }
+      .tuto-grid {
+        grid-template-columns: minmax(0, 1fr); /* 1열로 변경해 세로 글자 쪼개짐 해결 */
+        gap: 0.7rem;
+      }
+      .tuto-card {
+        padding: 0.85rem;
+      }
+      .tuto-card h4 {
+        font-size: 0.9rem;
+      }
+      .tuto-card p {
+        font-size: 0.82rem;
+      }
+      .tuto-modal-footer {
+        padding: 0.8rem 1rem;
+      }
+      .tuto-modal-footer button {
+        width: 100%;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.95rem !important;
+      }
+
+      /* 로비 화면 모바일 최적화 */
+      .lobby-container {
+        padding: 0.65rem;
+        align-items: flex-start;
+      }
+      .lobby-card {
+        padding: 1.1rem;
+        max-height: 95dvh;
+      }
+      .lobby-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+        margin-bottom: 0.9rem;
+        padding-bottom: 0.7rem;
+      }
+      .lobby-header h1 {
+        font-size: 1.2rem !important;
+      }
+      .create-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .room-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem;
+        padding: 0.75rem;
+      }
+      .room-item-actions {
+        width: 100%;
+      }
+      .room-item-actions button {
+        flex: 1;
+        padding: 0.55rem;
+        font-size: 0.84rem;
+      }
+
+      /* 인게임 상단 HUD: 3단 깔끔 스택 구조 (글자 세로 쪼개짐 0%) */
+      .top-hud {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0.45rem 0.65rem;
+        gap: 0.38rem;
+      }
+      .hud-left {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+      .room-title-label {
+        max-width: 125px;
+        font-size: 0.85rem;
+      }
+      .status-label {
+        width: 100%;
+        text-align: center;
+        font-size: 0.78rem;
+        background: rgba(255, 255, 255, 0.04);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+      .hud-center {
+        width: 100%;
+        justify-content: space-between;
+        gap: 0.35rem;
+      }
+      .player-pill {
+        flex: 1;
+        justify-content: center;
+        padding: 0.28rem 0.45rem;
+        font-size: 0.76rem;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .timer-pill {
+        padding: 0.28rem 0.5rem;
+        font-size: 0.82rem;
+        min-width: 48px;
+      }
+      .hud-right {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+        gap: 0.35rem;
+      }
+      .hud-btn {
+        padding: 0.35rem 0.55rem;
+        font-size: 0.73rem;
+      }
+
+      /* 모바일 플로팅 채팅 및 GIF 크기 조정 */
+      .floating-chat-area {
+        right: 8px;
+        width: 235px;
+        max-height: 28vh;
+      }
+      .chat-bubble {
+        font-size: 0.76rem;
+        padding: 0.36rem 0.65rem;
+      }
+      .cursor-gif-float {
+        width: 82px;
+        height: 82px;
+      }
+      .cursor-gif-card {
+        margin-left: 10px;
+        margin-top: -86px;
+      }
+      .dock-hover-preview {
+        display: none !important; /* 모바일 터치 시 hover 툴팁 잔상 방지 */
+      }
+
+      /* 하단 1~20 GIF 독 모바일 최적화 */
+      .bottom-emote-dock {
+        height: 74px;
+        justify-content: flex-start; /* 1번부터 왼쪽 정렬 시작 */
+        padding: 0.3rem 0.5rem;
+        gap: 0.32rem;
+      }
+      .emote-slot {
+        width: 52px;
+        height: 60px;
+        min-width: 52px;
+      }
+      .emote-slot-thumb {
+        width: 34px;
+        height: 34px;
+      }
+      .emote-slot-name {
+        font-size: 0.54rem;
+        max-width: 48px;
+      }
+    }
+
+    /* ==========================================================================
+       @MEDIA 3: 모바일 가로 모드 (Landscape) 대응
+       ========================================================================== */
+    @media (max-height: 520px) and (orientation: landscape) {
+      .top-hud {
+        flex-direction: row;
+        min-height: 46px;
+        padding: 0.25rem 0.6rem;
+      }
+      .status-label {
+        width: auto;
+      }
+      .bottom-emote-dock {
+        height: 62px;
+      }
+      .emote-slot {
+        width: 46px;
+        height: 52px;
+        min-width: 46px;
+      }
+      .emote-slot-thumb {
+        width: 28px;
+        height: 28px;
+      }
     }
   </style>
 </head>
@@ -678,7 +1022,7 @@
   <!-- 모든 참여자의 커서와 플로팅 GIF 컨테이너 -->
   <div id="playerCursors" class="player-cursors-container"></div>
 
-  <!-- 내 마우스 우측 하단에 따라다니는 미니 아이디 캡슐 & 1초 숫자 입력 게이지 -->
+  <!-- 내 마우스/터치 우측 하단에 따라다니는 미니 아이디 캡슐 & 1초 숫자 입력 게이지 -->
   <div id="localCursorFollower" class="local-cursor-follower">
     <div class="local-mini-id" id="localMiniIdBox">
       <span id="localColorDot" style="width:7px;height:7px;border-radius:50%;background:#6366f1;display:inline-block;"></span>
@@ -690,7 +1034,7 @@
     </div>
   </div>
 
-  <!-- 하단 독 마우스 호버 확대 프리뷰 툴팁 -->
+  <!-- 하단 독 마우스 호버 확대 프리뷰 툴팁 (PC 전용) -->
   <div id="dockHoverPreview" class="dock-hover-preview">
     <div id="dockHoverImg" class="dock-hover-preview-img"></div>
     <div id="dockHoverLabel" class="dock-hover-preview-label">#1 bonk</div>
@@ -700,73 +1044,75 @@
   <div id="vsSplashOverlay" class="vs-splash-overlay">
     <div class="vs-splash-card" id="vsSplashCard">
       <div style="text-align:center;">
-        <div style="font-size:0.8rem;color:#9ca3af;">BLACK (선공)</div>
-        <div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:4px;" id="vsBlackName">흑돌</div>
+        <div style="font-size:0.78rem;color:#9ca3af;">BLACK (선공)</div>
+        <div style="font-size:1.25rem;font-weight:900;color:#fff;margin-top:4px;" id="vsBlackName">흑돌</div>
       </div>
       <div class="vs-badge">VS</div>
       <div style="text-align:center;">
-        <div style="font-size:0.8rem;color:#9ca3af;">WHITE (후공)</div>
-        <div style="font-size:1.4rem;font-weight:900;color:#fff;margin-top:4px;" id="vsWhiteName">백돌</div>
+        <div style="font-size:0.78rem;color:#9ca3af;">WHITE (후공)</div>
+        <div style="font-size:1.25rem;font-weight:900;color:#fff;margin-top:4px;" id="vsWhiteName">백돌</div>
       </div>
     </div>
   </div>
 
   <!-- 토스트 알림 & 턴 교대 슬라이드 배너 -->
   <div id="toastAlert" class="toast-alert">클립보드에 복사되었습니다!</div>
-  <div id="turnSlideBanner" class="turn-slide-banner">🟢 내 차례입니다! 멋지게 한 수 둬보자고요~</div>
+  <div id="turnSlideBanner" class="turn-slide-banner">내 차례입니다! 멋지게 한 수 둬보자고요~</div>
 
   <!-- ==========================================
-       인간미 넘치는 구어체 튜토리얼 모달
+       반응형 튜토리얼 모달 (모바일 1열 / 패드·PC 2열)
        ========================================== -->
   <div class="modal-backdrop" id="tutorialModal">
     <div class="tutorial-modal" id="tutorialModalCard">
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--panel-border);padding-bottom:0.9rem;">
+      <div class="tuto-modal-header">
         <div>
-          <h2 style="font-size:1.35rem;">✋ 잠깐! 입장하기 전에 읽고 가실게요~</h2>
-          <p style="font-size:0.86rem;color:var(--text-sub);margin-top:0.25rem;">그냥 돌만 두는 오목이 아닙니다. 조작법 5가지!</p>
+          <h2 style="font-size:1.25rem;">잠깐! 입장하기 전에 읽고 가실게요~</h2>
+          <p style="font-size:0.82rem;color:var(--text-sub);margin-top:0.2rem;">어디서든 함께 노는 멀티 오목 가이드!</p>
         </div>
-        <button class="btn-sec" id="closeTutoTopBtn">닫기 ✕</button>
+        <button class="btn-sec" id="closeTutoTopBtn" style="padding:0.45rem 0.75rem;">닫기 ✕</button>
       </div>
 
-      <div class="tuto-grid">
-        <div class="tuto-card">
-          <h4>1. 마우스 다 보입니다</h4>
-          <p>
-            관전자든 대국자든 마우스 움직이는 게 실시간으로 다 보입니다! 마우스 옆에 <b>작은 이름표</b>도 같이 따라다니니까 <i>"어디 둘까~"</i> 흔들면서 상대방 멘탈 흔드는 심리전 마음껏 걸어보세요.
-          </p>
-        </div>
+      <div class="tuto-modal-body">
+        <div class="tuto-grid">
+          <div class="tuto-card">
+            <h4>1. 마우스 & 터치 위치 다 보입니다</h4>
+            <p>
+              관전자든 대국자든 마우스나 손가락 움직임이 실시간으로 다 보입니다! 옆에 <b>작은 이름표</b>도 같이 따라다니니까 <i>"어디 둘까~"</i> 흔들면서 상대방 멘탈 흔드는 심리전 마음껏 걸어보세요.
+            </p>
+          </div>
 
-        <div class="tuto-card">
-          <h4>2. 숫자키 1~20 누르면 GIF로 꼽을 줍니다</h4>
-          <p>
-            게임 중에 키보드 숫자 <span class="kbd">1</span>~<span class="kbd">20</span>을 치면 내 마우스 오른쪽 위에 움직이는 GIF가 착! 붙어서 따라다닙니다. <span class="kbd">3</span>~<span class="kbd">9</span>번은 누르자마자 바로 나가고, <span class="kbd">1</span>이나 <span class="kbd">2</span>는 두 자릿수(<span class="kbd">10</span>~<span class="kbd">20</span>) 치실까 봐 딱 1초만 기다려줘요!
-          </p>
-        </div>
+          <div class="tuto-card">
+            <h4>2. 하단 GIF 터치 또는 숫자 1~20 사용</h4>
+            <p>
+              하단 1~20번 GIF를 <b>직접 터치/클릭</b>하거나 키보드 숫자 <span class="kbd">1</span>~<span class="kbd">20</span>을 치면 내 포인터 위에 움직이는 GIF가 착! 붙어서 따라다닙니다. (<span class="kbd">1</span>·<span class="kbd">2</span>는 두 자릿수 입력을 위해 1초 대기!)
+            </p>
+          </div>
 
-        <div class="tuto-card">
-          <h4>3. 채팅 치는법은 그냥 엔터만 누르시면 됩니다</h4>
-          <p>
-            수 읽기 바쁜데 언제 마우스로 채팅창 찍고 있나요. 그냥 <span class="kbd">Enter</span> 탁 치면 바로 입력창 열리고, 할 말 치고 또 <span class="kbd">Enter</span> 치면 우측 상단에 말풍선이 슈욱~ 올라갑니다. (꼽주기 최적화!)
-          </p>
-        </div>
+          <div class="tuto-card">
+            <h4>3. Enter 한 번 / 모바일 채팅 버튼</h4>
+            <p>
+              PC/패드 키보드에선 <span class="kbd">Enter</span> 치면 바로 입력창 열리고, 스마트폰에선 상단 <b>[💬 채팅]</b> 버튼을 누르면 됩니다. 전송하면 우측 상단에 말풍선이 올라갑니다!
+            </p>
+          </div>
 
-        <div class="tuto-card">
-          <h4>4. 3명 이상 같은 GIF 털면 콤보 + Shift 레이저</h4>
-          <p>
-            방 사람들이 3초 안에 똑같은 번호의 GIF을 3번 이상 연타하면 화면 한가운데 <b>대왕 콤보 배너</b>가 터집니다! 그리고 <span class="kbd">Shift</span> 누른 채로 마우스 흔들면 네온 레이저 포인터 나가니까 여기 보라고 밑줄 그을 때 쓰세요.
-          </p>
-        </div>
+          <div class="tuto-card">
+            <h4>4. 3명 이상 같은 GIF를 털면 콤보 + Shift 레이저</h4>
+            <p>
+              방 사람들이 3초 안에 똑같은 번호의 GIF을 3번 이상 연타하면 화면 한가운데 <b>대왕 콤보 배너</b>가 터집니다! PC에선 <span class="kbd">Shift</span> 누른 채 마우스 흔들면 네온 레이저도 나갑니다.
+            </p>
+          </div>
 
-        <div class="tuto-card" style="grid-column: span 2;">
-          <h4>5. 관전자끼리만 통하는 비밀 훈수 투표 (우클릭)</h4>
-          <p>
-            관전하다가 <i>"아 거기 막아야 되는데!"</i> 싶으면 바둑판 빈자리에 <b>마우스 우클릭</b> 해보세요. 관전자들 눈에만 보이는 파란색 득표 원이 커집니다. <b>대국자 두 명한테는 절대 안 보이니까</b> 눈치 보지 말고 맘껏 찍어보세요!
-          </p>
+          <div class="tuto-card span-full">
+            <h4>5. 관전자끼리만 통하는 비밀 훈수 투표 (우클릭)</h4>
+            <p>
+              관전하다가 <i>"아 거기 막아야 되는데!"</i> 싶으면 바둑판 빈자리에 <b>마우스 우클릭</b> 해보세요. 관전자들 눈에만 보이는 파란색 득표 원이 커집니다. <b>대국자 두 명한테는 절대 안 보이니까</b> 눈치 보지 말고 맘껏 찍어보세요!
+            </p>
+          </div>
         </div>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;">
-        <button id="startFromTutoBtn" style="padding:0.8rem 1.8rem;font-size:1rem;">오케이 접수 완료! 방 보러 가기 </button>
+      <div class="tuto-modal-footer">
+        <button id="startFromTutoBtn" style="padding:0.75rem 1.6rem;font-size:0.98rem;">오케이 접수 완료! 방 보러 가기</button>
       </div>
     </div>
   </div>
@@ -778,12 +1124,9 @@
     <div class="lobby-card">
       <div class="lobby-header">
         <div>
-          <h1 style="font-size: 1.5rem;">⚫⚪ 오목 한 판 뜨실분~</h1>
-          <p style="font-size: 0.84rem; color: var(--text-sub); margin-top: 0.2rem;">
-            마우스 옆 미니 이름표 · 1~20번 GIF 플로팅 · Enter 채팅 · 우클릭 관전자 비밀 훈수
-          </p>
+          <h1 style="font-size: 1.4rem;">⚫⚪ 실시간 오목 한 판 뜨실분~</h1>
         </div>
-        <button class="btn-sec" id="openTutoLobbyBtn">📘 사용법 다시 보기</button>
+        <button class="btn-sec" id="openTutoLobbyBtn" style="padding:0.5rem 0.8rem;font-size:0.84rem;">📘 사용법 보기</button>
       </div>
 
       <div class="create-row">
@@ -793,7 +1136,7 @@
         <button id="createJoinBtn">방파기 / 들어가기</button>
       </div>
 
-      <h3 style="font-size: 0.92rem; color: var(--text-sub); margin-bottom: 0.6rem;">현재 열려있는 방들</h3>
+      <h3 style="font-size: 0.9rem; color: var(--text-sub); margin-bottom: 0.55rem;">현재 열려있는 방들</h3>
       <div class="room-list" id="roomListContainer"></div>
     </div>
   </div>
@@ -804,10 +1147,10 @@
   <div class="game-screen" id="gameView">
     <div class="top-hud" id="topHud">
       <div class="hud-left">
-        <strong id="roomTitleText" style="font-size: 0.96rem;">오목방</strong>
-        <button class="btn-sec" id="copyRoomBtn" style="padding: 0.28rem 0.55rem; font-size: 0.74rem;">📋 방번호 복사</button>
-        <span id="spectatorCountText" style="font-size: 0.82rem; color: var(--text-sub);">👀 구경꾼 0명</span>
-        <span id="statusText" style="font-size: 0.86rem; font-weight: 700; color: #34d399; margin-left: 0.3rem;">기다리는 중...</span>
+        <span class="room-title-label" id="roomTitleText">오목방</span>
+        <button class="btn-sec hud-btn" id="copyRoomBtn">📋 복사</button>
+        <span class="spectator-label" id="spectatorCountText">👀 0명</span>
+        <span class="status-label" id="statusText">기다리는 중...</span>
       </div>
 
       <div class="hud-center">
@@ -817,13 +1160,14 @@
       </div>
 
       <div class="hud-right">
-        <button class="btn-sec" id="swapSideBtn" style="display: none; padding: 0.4rem 0.68rem; font-size: 0.76rem;">🔄 흑↔백 자리바꾸기</button>
-        <button class="btn-sec" id="openTutoGameBtn" style="padding: 0.4rem 0.68rem; font-size: 0.76rem;">📘 설명서</button>
-        <button class="btn-sec" id="focusToggleBtn" style="padding: 0.4rem 0.68rem; font-size: 0.76rem;">관전커서 반투명(Tab): OFF</button>
-        <button class="btn-sec" id="toggleNumBtn" style="padding: 0.4rem 0.68rem; font-size: 0.76rem;">수순: OFF</button>
-        <button class="btn-danger" id="surrenderBtn" style="display: none; padding: 0.4rem 0.68rem; font-size: 0.76rem;">🏳️ 기권</button>
-        <button id="restartBtn" style="display: none; padding: 0.4rem 0.68rem; font-size: 0.76rem;">🔥 리매치</button>
-        <button class="btn-sec" id="leaveBtn" style="padding: 0.4rem 0.68rem; font-size: 0.76rem;">나가기</button>
+        <button class="hud-btn" id="mobileChatOpenBtn" style="background:#4f46e5;">💬 채팅</button>
+        <button class="btn-sec hud-btn" id="swapSideBtn" style="display: none;">🔄 자리교체</button>
+        <button class="btn-sec hud-btn" id="openTutoGameBtn">📘 설명서</button>
+        <button class="btn-sec hud-btn" id="focusToggleBtn">커서흐림: OFF</button>
+        <button class="btn-sec hud-btn" id="toggleNumBtn">수순: OFF</button>
+        <button class="btn-danger hud-btn" id="surrenderBtn" style="display: none;">🏳️ 기권</button>
+        <button class="hud-btn" id="restartBtn" style="display: none;">🔥 리매치</button>
+        <button class="btn-sec hud-btn" id="leaveBtn">나가기</button>
       </div>
     </div>
 
@@ -831,15 +1175,16 @@
     <div class="combo-resonance-banner" id="comboBanner">
       <div class="combo-gif-box" id="comboBannerGif"></div>
       <div>
-        <div style="font-size:0.76rem;color:#fde047;font-weight:800;letter-spacing:1px;">방 전체 대동단결!</div>
-        <div style="font-size:1.35rem;font-weight:900;color:#fff;" id="comboBannerText">x3 BONK COMBO!</div>
+        <div style="font-size:0.72rem;color:#fde047;font-weight:800;letter-spacing:1px;">모기들 대동단결! 아쎼이!</div>
+        <div style="font-size:1.15rem;font-weight:900;color:#fff;" id="comboBannerText">x3 BONK COMBO!</div>
       </div>
     </div>
 
-    <!-- 무클릭 Enter 채팅 입력 바 -->
+    <!-- 무클릭 Enter & 터치 채팅 입력 바 -->
     <div class="quick-chat-bar" id="quickChatBar">
-      <span style="font-size: 0.8rem; color: #a5b4fc; font-weight: 800;">꼽주기</span>
-      <input type="text" id="quickChatInput" placeholder="할 말 치고 Enter! (취소는 ESC)" maxlength="120" autocomplete="off" />
+      <span style="font-size: 0.78rem; color: #a5b4fc; font-weight: 800; white-space: nowrap;">꼽주기</span>
+      <input type="text" id="quickChatInput" placeholder="할 말 입력..." maxlength="120" autocomplete="off" />
+      <button id="quickChatSendBtn" style="padding:0.35rem 0.75rem;font-size:0.82rem;">전송</button>
     </div>
 
     <!-- 우측 상단 플로팅 채팅 피드 -->
@@ -862,7 +1207,7 @@
     const socket = io();
 
     // ==============================================================
-    // 1. [디버깅 완료] 19종 에셋 매핑 + 멀티 확장자(.gif/.png/.webp/.jpg) 자동 탐색기
+    // 1. 19종 에셋 매핑 + 멀티 확장자(.gif/.png/.webp/.jpg) 자동 탐색기
     // ==============================================================
     const GIF_PRESETS = [
       { id: 1,  name: 'bonk',             base: '/gifs/bonk' },
@@ -889,7 +1234,6 @@
 
     const EXT_CANDIDATES = ['.gif', '.png', '.webp', '.jpg', '.jpeg', '.GIF', '.PNG'];
 
-    // .gif가 없을 경우 .png -> .webp -> .jpg 순으로 자동 재시도하는 스마트 이미지 노드 생성기
     function createSafeGifNode(emoteId) {
       const preset = GIF_PRESETS.find((p) => p.id === Number(emoteId)) || GIF_PRESETS[0];
       const wrapper = document.createElement('div');
@@ -925,7 +1269,6 @@
       return wrapper;
     }
 
-    // 하단 1~20 독 생성 + 마우스 호버 확대 프리뷰 툴팁
     const bottomEmoteDock = document.getElementById('bottomEmoteDock');
     const dockHoverPreview = document.getElementById('dockHoverPreview');
     const dockHoverImg = document.getElementById('dockHoverImg');
@@ -950,6 +1293,7 @@
       slot.append(numSpan, thumbDiv, nameSpan);
 
       slot.addEventListener('mouseenter', () => {
+        if (window.innerWidth < 1200) return; // 모바일/태블릿 터치 호버 잔상 방지
         gsap.to(slot, { y: -6, scale: 1.08, borderColor: '#6366f1', duration: 0.18, ease: 'power2.out' });
         const rect = slot.getBoundingClientRect();
         dockHoverImg.innerHTML = '';
@@ -966,7 +1310,7 @@
       });
 
       slot.addEventListener('click', () => {
-        gsap.fromTo(slot, { scale: 0.88 }, { scale: 1.08, duration: 0.25, ease: 'elastic.out(1, 0.4)' });
+        gsap.fromTo(slot, { scale: 0.88 }, { scale: 1, duration: 0.25, ease: 'elastic.out(1, 0.4)' });
         triggerMyEmote(preset.id);
       });
 
@@ -974,7 +1318,7 @@
     });
 
     // ==============================================================
-    // 2. [소켓 디버깅 완료] undefined 닉네임 100% 방지 3중 폴백 함수
+    // 2. undefined 닉네임 100% 방지 3중 폴백 함수
     // ==============================================================
     let myValidatedNickname = '';
 
@@ -1022,13 +1366,13 @@
     function openTutorialModal() {
       tutorialModal.style.display = 'flex';
       gsap.fromTo(tutorialModalCard,
-        { scale: 0.85, opacity: 0, y: 20 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.6)' }
+        { scale: 0.88, opacity: 0, y: 18 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.35, ease: 'back.out(1.5)' }
       );
     }
     function closeTutorialModal() {
       gsap.to(tutorialModalCard, {
-        scale: 0.9, opacity: 0, duration: 0.2, ease: 'power2.in',
+        scale: 0.92, opacity: 0, duration: 0.18, ease: 'power2.in',
         onComplete: () => { tutorialModal.style.display = 'none'; }
       });
     }
@@ -1037,10 +1381,6 @@
     document.getElementById('startFromTutoBtn').addEventListener('click', closeTutorialModal);
     document.getElementById('openTutoLobbyBtn').addEventListener('click', openTutorialModal);
     document.getElementById('openTutoGameBtn').addEventListener('click', openTutorialModal);
-
-    gsap.from('.tuto-card', {
-      y: 25, opacity: 0, stagger: 0.07, duration: 0.45, ease: 'power2.out', delay: 0.1
-    });
 
     function spawnAnimeShockwave(px, py, color = '#6366f1', count = 0) {
       const ripple = document.createElement('div');
@@ -1054,12 +1394,12 @@
 
       anime({
         targets: ripple,
-        width: count > 0 ? 92 : 48,
-        height: count > 0 ? 92 : 48,
+        width: count > 0 ? 88 : 46,
+        height: count > 0 ? 88 : 46,
         opacity: [0.95, 0],
         borderWidth: [3, 0],
         easing: 'easeOutExpo',
-        duration: count > 0 ? 750 : 480,
+        duration: count > 0 ? 720 : 460,
         complete: () => ripple.remove()
       });
 
@@ -1072,7 +1412,7 @@
         document.body.appendChild(sp);
 
         const angle = (Math.PI * 2 * i) / count;
-        const dist = 32 + Math.random() * 45;
+        const dist = 30 + Math.random() * 42;
         anime({
           targets: sp,
           translateX: Math.cos(angle) * dist,
@@ -1080,7 +1420,7 @@
           scale: [1.4, 0],
           opacity: [1, 0],
           easing: 'easeOutCubic',
-          duration: 600 + Math.random() * 350,
+          duration: 580 + Math.random() * 320,
           complete: () => sp.remove()
         });
       }
@@ -1096,8 +1436,8 @@
       gsap.timeline({
         onComplete: () => { overlay.style.display = 'none'; }
       })
-      .fromTo(card, { scale: 0.3, opacity: 0, rotation: -6 }, { scale: 1, opacity: 1, rotation: 0, duration: 0.45, ease: 'elastic.out(1, 0.6)' })
-      .to(card, { scale: 1.1, opacity: 0, duration: 0.3, delay: 1.2, ease: 'power2.in' });
+      .fromTo(card, { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.42, ease: 'elastic.out(1, 0.6)' })
+      .to(card, { scale: 1.08, opacity: 0, duration: 0.28, delay: 1.15, ease: 'power2.in' });
     }
 
     function showToast(msg) {
@@ -1112,10 +1452,12 @@
 
     function showMyTurnBanner() {
       const b = document.getElementById('turnSlideBanner');
+      const topH = topHud.offsetHeight || 62;
+      b.style.top = `${topH + 10}px`;
       gsap.killTweensOf(b);
       gsap.timeline()
         .to(b, { opacity: 1, y: 0, duration: 0.35, ease: 'back.out(1.7)' })
-        .to(b, { opacity: 0, y: -25, duration: 0.3, ease: 'power2.in', delay: 1.6 });
+        .to(b, { opacity: 0, y: -25, duration: 0.3, ease: 'power2.in', delay: 1.5 });
     }
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -1151,13 +1493,16 @@
     }
 
     // ==============================================================
-    // 5. Retina 고해상도 캔버스 & Window W/H 실시간 감시
+    // 5. Retina 고해상도 캔버스 & 다중 기기(W/H) 동적 레이아웃 감시
     // ==============================================================
     const canvas = document.getElementById('boardCanvas');
     const ctx = canvas.getContext('2d');
     const laserCanvas = document.getElementById('laserCanvas');
     const laserCtx = laserCanvas.getContext('2d');
     const topHud = document.getElementById('topHud');
+    const floatingChatArea = document.getElementById('floatingChatArea');
+    const quickChatBar = document.getElementById('quickChatBar');
+    const comboBanner = document.getElementById('comboBanner');
 
     const LOGICAL_SIZE = 640;
     const BOARD_SIZE = 15;
@@ -1178,20 +1523,29 @@
       laserCanvas.width = winW;
       laserCanvas.height = winH;
 
+      // 상단 HUD와 하단 독의 실제 높이를 실시간 측정해 오목판과 플로팅 UI 위치를 자동 재배치
       const topH = topHud.offsetHeight || 62;
-      const bottomH = bottomEmoteDock.offsetHeight || 86;
-      const availH = winH - topH - bottomH - 26;
-      const availW = winW - 32;
-      const boardPx = Math.max(260, Math.min(740, Math.floor(Math.min(availW, availH))));
+      const bottomH = bottomEmoteDock.offsetHeight || 84;
+      const padMargin = winW < 768 ? 14 : 26;
+
+      const availH = winH - topH - bottomH - padMargin;
+      const availW = winW - (winW < 768 ? 16 : 32);
+      const boardPx = Math.max(240, Math.min(740, Math.floor(Math.min(availW, availH))));
 
       canvas.style.width = `${boardPx}px`;
       canvas.style.height = `${boardPx}px`;
+
+      // 플로팅 채팅, 채팅 입력바, 콤보 배너가 멀티줄 모바일/패드 HUD를 가리지 않도록 아래로 배치
+      floatingChatArea.style.top = `${topH + 8}px`;
+      quickChatBar.style.top = `${topH + 10}px`;
+      comboBanner.style.top = `${topH + 14}px`;
+
       drawBoard();
     }
     window.addEventListener('resize', updateResponsiveLayout);
 
     // ==============================================================
-    // 6. GSAP quickTo 기반 커서 옆 미니 아이디 & 무간섭 GIF 플로팅 엔진
+    // 6. PC 마우스 + 모바일/패드 터치 통합 커서 & GIF 추종 엔진
     // ==============================================================
     const playerCursorsContainer = document.getElementById('playerCursors');
     const localCursorFollower = document.getElementById('localCursorFollower');
@@ -1206,7 +1560,6 @@
     let myCursorColor = '#6366f1';
     let lastCursorEmit = 0;
 
-    // 내 마우스 우측 하단(+16px, +20px)을 부드럽게 따라다니는 미니 아이디
     const moveLocalFollowerX = gsap.quickTo(localCursorFollower, 'x', { duration: 0.06, ease: 'power2.out' });
     const moveLocalFollowerY = gsap.quickTo(localCursorFollower, 'y', { duration: 0.06, ease: 'power2.out' });
 
@@ -1318,28 +1671,31 @@
       }
     }
 
-    window.addEventListener('mousemove', (e) => {
-      myScreenPos = { x: e.clientX, y: e.clientY };
+    // PC 마우스 및 모바일/태블릿 터치 좌표 통합 업데이트 함수
+    function handleLocalPointerMove(clientX, clientY, shiftPressed = false) {
+      myScreenPos = { x: clientX, y: clientY };
       if (document.getElementById('gameView').style.display !== 'flex') return;
 
-      isShiftDown = e.shiftKey;
-      myNormPos = clientToBoardCenterOffset(e.clientX, e.clientY);
+      isShiftDown = shiftPressed;
+      myNormPos = clientToBoardCenterOffset(clientX, clientY);
 
-      // 내 마우스 우측 하단(+16px, +20px)으로 미니 아이디 위치 갱신 (상단 GIF와 완벽 분리)
-      moveLocalFollowerX(e.clientX + 16);
-      moveLocalFollowerY(e.clientY + 20);
+      // 화면 우측 가장자리에서 닉네임 캡슐이 잘리지 않도록 보정
+      const safeFollowerX = Math.min(window.innerWidth - 95, clientX + 14);
+      const safeFollowerY = Math.min(window.innerHeight - 36, clientY + 18);
+      moveLocalFollowerX(safeFollowerX);
+      moveLocalFollowerY(safeFollowerY);
 
       if (isShiftDown && prevMyScreenPos) {
         laserSegments.push({
           x1: prevMyScreenPos.x,
           y1: prevMyScreenPos.y,
-          x2: e.clientX,
-          y2: e.clientY,
+          x2: clientX,
+          y2: clientY,
           color: myCursorColor,
           time: performance.now()
         });
       }
-      prevMyScreenPos = { x: e.clientX, y: e.clientY };
+      prevMyScreenPos = { x: clientX, y: clientY };
 
       const now = performance.now();
       if (now - lastCursorEmit > 30) {
@@ -1350,7 +1706,23 @@
           laser: isShiftDown
         });
       }
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      handleLocalPointerMove(e.clientX, e.clientY, e.shiftKey);
     });
+
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) {
+        handleLocalPointerMove(e.touches[0].clientX, e.touches[0].clientY, false);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) {
+        handleLocalPointerMove(e.touches[0].clientX, e.touches[0].clientY, false);
+      }
+    }, { passive: true });
 
     window.addEventListener('mousedown', (e) => {
       if (document.getElementById('gameView').style.display !== 'flex') return;
@@ -1382,20 +1754,26 @@
       }
     });
 
+    // 모바일/패드 화면 상단에서도 GIF가 잘리지 않도록 Y 좌표 안전 클램핑
+    function clampGifScreenY(rawY) {
+      const minSafeY = window.innerWidth < 768 ? 96 : 122;
+      return Math.max(minSafeY, rawY);
+    }
+
     function renderLoop() {
       activeFloatingGifs.forEach((gifObj) => {
         if (gifObj.isLocal) {
-          gifObj.quickX(myScreenPos.x);
-          gifObj.quickY(myScreenPos.y);
+          gifObj.quickX(Math.min(window.innerWidth - 115, myScreenPos.x));
+          gifObj.quickY(clampGifScreenY(myScreenPos.y));
         } else {
           const ownerCursor = remoteCursors.get(gifObj.ownerId);
           if (ownerCursor) {
-            gifObj.quickX(ownerCursor.px);
-            gifObj.quickY(ownerCursor.py);
+            gifObj.quickX(Math.min(window.innerWidth - 115, ownerCursor.px));
+            gifObj.quickY(clampGifScreenY(ownerCursor.py));
           } else {
             const { px, py } = boardCenterOffsetToScreen(gifObj.fallbackX, gifObj.fallbackY);
-            gifObj.quickX(px);
-            gifObj.quickY(py);
+            gifObj.quickX(Math.min(window.innerWidth - 115, px));
+            gifObj.quickY(clampGifScreenY(py));
           }
         }
       });
@@ -1429,10 +1807,9 @@
     requestAnimationFrame(renderLoop);
 
     // ==============================================================
-    // 7. [디버깅 완료] 커서 우측 상단에 가림 없이 뜨는 GIF 플로팅
+    // 7. 커서 우측 상단에 가림 없이 뜨는 GIF 플로팅
     // ==============================================================
     function spawnFloatingGif({ ownerId, emoteId, x, y, isLocal }) {
-      // 동일 사용자의 이전 GIF가 떠있다면 겹치지 않게 즉시 정리
       activeFloatingGifs.forEach((existing) => {
         if ((isLocal && existing.isLocal) || (!isLocal && existing.ownerId === ownerId)) {
           existing.el.remove();
@@ -1457,7 +1834,10 @@
         startY = pos.py;
       }
 
-      gsap.set(floatWrap, { x: startX, y: startY });
+      gsap.set(floatWrap, {
+        x: Math.min(window.innerWidth - 115, startX),
+        y: clampGifScreenY(startY)
+      });
       playerCursorsContainer.appendChild(floatWrap);
 
       const quickX = gsap.quickTo(floatWrap, 'x', { duration: 0.06, ease: 'power2.out' });
@@ -1503,7 +1883,7 @@
 
     socket.on('emoteBroadcast', (data) => {
       const senderId = data?.playerId || data?.id;
-      if (senderId === socket.id) return; // 본인 중복 방지
+      if (senderId === socket.id) return;
       spawnFloatingGif({
         ownerId: senderId,
         emoteId: data.emoteId,
@@ -1514,7 +1894,7 @@
     });
 
     // ==============================================================
-    // 8. 스마트 1~20번 숫자 입력 버퍼 & 무클릭 Enter 채팅
+    // 8. 스마트 1~20번 숫자 입력 & PC Enter / 모바일 채팅 버튼 통합
     // ==============================================================
     let dimSpectatorCursors = false;
     const focusToggleBtn = document.getElementById('focusToggleBtn');
@@ -1522,13 +1902,11 @@
     function toggleSpectatorDim() {
       dimSpectatorCursors = !dimSpectatorCursors;
       playerCursorsContainer.classList.toggle('dim-spectators', dimSpectatorCursors);
-      focusToggleBtn.textContent = `관전커서 반투명(Tab): ${dimSpectatorCursors ? 'ON' : 'OFF'}`;
+      focusToggleBtn.textContent = `커서흐림: ${dimSpectatorCursors ? 'ON' : 'OFF'}`;
     }
     focusToggleBtn.addEventListener('click', toggleSpectatorDim);
 
-    const quickChatBar = document.getElementById('quickChatBar');
     const quickChatInput = document.getElementById('quickChatInput');
-    const floatingChatArea = document.getElementById('floatingChatArea');
     const localDigitBox = document.getElementById('localDigitBox');
     const localDigitText = document.getElementById('localDigitText');
     const localDigitFill = document.getElementById('localDigitFill');
@@ -1537,10 +1915,36 @@
     let digitBuffer = '';
     let digitTimer = null;
 
+    function openChatBar() {
+      clearDigitBuffer();
+      quickChatBar.classList.add('active');
+      gsap.fromTo(quickChatBar, { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.2, ease: 'back.out(1.7)' });
+      quickChatInput.focus();
+    }
+
+    function submitAndCloseChat() {
+      const text = quickChatInput.value.trim();
+      if (text) socket.emit('sendChat', text);
+      quickChatInput.value = '';
+      quickChatInput.blur();
+    }
+
+    document.getElementById('mobileChatOpenBtn').addEventListener('click', () => {
+      if (isChatFocused) {
+        submitAndCloseChat();
+      } else {
+        openChatBar();
+      }
+    });
+
+    document.getElementById('quickChatSendBtn').addEventListener('click', submitAndCloseChat);
+
     quickChatInput.addEventListener('focus', () => { isChatFocused = true; });
     quickChatInput.addEventListener('blur', () => {
       isChatFocused = false;
-      quickChatBar.classList.remove('active');
+      setTimeout(() => {
+        if (!isChatFocused) quickChatBar.classList.remove('active');
+      }, 120);
     });
 
     window.addEventListener('keydown', (e) => {
@@ -1556,15 +1960,9 @@
       if (e.key === 'Enter') {
         e.preventDefault();
         if (!isChatFocused) {
-          clearDigitBuffer();
-          quickChatBar.classList.add('active');
-          gsap.fromTo(quickChatBar, { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.2, ease: 'back.out(1.7)' });
-          quickChatInput.focus();
+          openChatBar();
         } else {
-          const text = quickChatInput.value.trim();
-          if (text) socket.emit('sendChat', text);
-          quickChatInput.value = '';
-          quickChatInput.blur();
+          submitAndCloseChat();
         }
         return;
       }
@@ -1631,21 +2029,20 @@
     socket.on('comboResonance', ({ emoteId, count }) => {
       playTone('combo');
       const preset = GIF_PRESETS.find((p) => p.id === emoteId) || GIF_PRESETS[0];
-      const banner = document.getElementById('comboBanner');
       const gifBox = document.getElementById('comboBannerGif');
       gifBox.innerHTML = '';
       gifBox.appendChild(createSafeGifNode(emoteId));
       document.getElementById('comboBannerText').textContent = `🔥 x${count} ${preset.name.toUpperCase()} COMBO!`;
 
-      banner.style.display = 'flex';
-      gsap.fromTo(banner,
+      comboBanner.style.display = 'flex';
+      gsap.fromTo(comboBanner,
         { scale: 0.4, opacity: 0, y: -20 },
         { scale: 1, opacity: 1, y: 0, duration: 0.45, ease: 'elastic.out(1, 0.5)' }
       );
 
       if (comboHideTimer) clearTimeout(comboHideTimer);
       comboHideTimer = setTimeout(() => {
-        gsap.to(banner, { scale: 0.8, opacity: 0, duration: 0.25, onComplete: () => { banner.style.display = 'none'; } });
+        gsap.to(comboBanner, { scale: 0.8, opacity: 0, duration: 0.25, onComplete: () => { comboBanner.style.display = 'none'; } });
       }, 3200);
     });
 
@@ -1662,12 +2059,13 @@
       floatingChatArea.appendChild(bubble);
       gsap.fromTo(bubble, { x: 30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.25, ease: 'power2.out' });
 
-      while (floatingChatArea.children.length > 7) {
+      const maxBubbles = window.innerWidth < 768 ? 4 : 7;
+      while (floatingChatArea.children.length > maxBubbles) {
         floatingChatArea.firstElementChild.remove();
       }
       setTimeout(() => {
         gsap.to(bubble, { opacity: 0, y: -10, duration: 0.35, onComplete: () => bubble.remove() });
-      }, 6500);
+      }, 6000);
     });
 
     // ==============================================================
@@ -1717,19 +2115,19 @@
 
     socket.on('roomList', (list) => {
       if (!list || list.length === 0) {
-        roomListContainer.innerHTML = `<div style="text-align:center;color:var(--text-sub);padding:2rem;">아직 방이 하나도 없네요! 위에서 첫 방을 파보세요~</div>`;
+        roomListContainer.innerHTML = `<div style="text-align:center;color:var(--text-sub);padding:1.5rem;">아직 방이 하나도 없네요! 위에서 첫 방을 파보세요~</div>`;
         return;
       }
       roomListContainer.innerHTML = list.map((r) => {
         const canPlay = r.status === 'waiting' && r.playerCount < 2;
         return `
           <div class="room-item">
-            <div>
+            <div class="room-item-info">
               <span class="badge ${canPlay ? 'badge-wait' : 'badge-play'}">${canPlay ? '빈자리 있음' : '빡겜 중'}</span>
               <strong>[${escapeHtml(r.id)}] ${escapeHtml(r.title)}</strong>
-              <span style="color:var(--text-sub);font-size:0.84rem;margin-left:0.5rem;">대국 ${r.playerCount}/2 · 구경꾼 ${r.spectatorCount}명</span>
+              <span style="color:var(--text-sub);font-size:0.82rem;">대국 ${r.playerCount}/2 · 구경꾼 ${r.spectatorCount}명</span>
             </div>
-            <div style="display:flex;gap:0.4rem;">
+            <div class="room-item-actions">
               ${canPlay ? `<button onclick="window.quickJoin('${escapeHtml(r.id)}', false)">들어가기</button>` : ''}
               <button class="btn-sec" onclick="window.quickJoin('${escapeHtml(r.id)}', true)">구경하기</button>
             </div>
@@ -1753,7 +2151,7 @@
       updateLocalCursorBadgeText();
 
       localCursorFollower.style.display = 'flex';
-      gsap.set(localCursorFollower, { x: myScreenPos.x + 16, y: myScreenPos.y + 20 });
+      gsap.set(localCursorFollower, { x: myScreenPos.x + 14, y: myScreenPos.y + 18 });
 
       remoteCursors.forEach((c) => c.el.remove());
       remoteCursors.clear();
@@ -1764,13 +2162,15 @@
       lobbyView.style.display = 'none';
       gameView.style.display = 'flex';
       document.getElementById('roomTitleText').textContent = `[${data.roomId}] ${data.title}`;
-      updateResponsiveLayout();
+
+      // DOM 렌더링 직후 멀티줄 모바일/패드 HUD 높이를 재측정하여 보드 크기 맞춤
+      requestAnimationFrame(() => updateResponsiveLayout());
     });
 
     document.getElementById('copyRoomBtn').addEventListener('click', () => {
       if (!currentRoomId) return;
       navigator.clipboard.writeText(currentRoomId).then(() => {
-        showToast(`방 번호 [${currentRoomId}] 복사 완료! 친구한테 던져주세요~`);
+        showToast(`방 번호 [${currentRoomId}] 복사 완료!`);
       });
     });
 
@@ -1791,7 +2191,6 @@
     });
 
     socket.on('updateState', (state) => {
-      // [디버깅 핵심] 서버의 플레이어/관전자 명단에서 내 닉네임을 한 번 더 역추적해 undefined 가능성 0%로 차단!
       const meInPlayers = state.players?.find((p) => p.id === socket.id);
       const meInSpecs = state.spectators?.find((s) => s.id === socket.id);
       if (meInPlayers?.nickname) {
@@ -1806,13 +2205,11 @@
       const bPlayer = state.players.find((p) => p.color === 'black');
       const wPlayer = state.players.find((p) => p.color === 'white');
 
-      // 대기 상태에서 2명이 모여 대국이 막 시작된 순간 VS 매치 스플래시 발동!
       if (prevStatus !== 'playing' && state.status === 'playing' && state.history.length === 0 && bPlayer && wPlayer) {
         playVsMatchSplash(bPlayer.nickname, wPlayer.nickname);
       }
       prevStatus = state.status;
 
-      // 새 돌 착수 시 Anime.js 파동 + 5목 승리 시 폭죽/바둑판 타격 진동!
       if (state.history.length > prevHistoryLen && state.lastMove) {
         playTone('stone');
         const rect = canvas.getBoundingClientRect();
@@ -1840,7 +2237,7 @@
         canvas.classList.remove('low-time-glow');
       }
 
-      document.getElementById('spectatorCountText').textContent = `👀 구경꾼 ${state.spectatorCount}명`;
+      document.getElementById('spectatorCountText').textContent = `👀 ${state.spectatorCount}명`;
       document.getElementById('blackName').textContent = bPlayer ? bPlayer.nickname : '빈자리';
       document.getElementById('blackWins').textContent = bPlayer ? bPlayer.wins : 0;
       document.getElementById('whiteName').textContent = wPlayer ? wPlayer.nickname : '빈자리';
@@ -1859,7 +2256,7 @@
         statusText.style.color = '#9ca3af';
       } else if (state.status === 'playing') {
         if (myRole === 'spectator') {
-          statusText.textContent = `구경 중 (${state.turn === 'black' ? '흑돌' : '백돌'} 차례 · 우클릭 비밀훈수)`;
+          statusText.textContent = `구경 중 (${state.turn === 'black' ? '흑돌' : '백돌'} 차례)`;
           statusText.style.color = '#38bdf8';
         } else {
           const myTurn = state.turn === myColor;
@@ -1871,7 +2268,8 @@
         statusText.style.color = '#fbbf24';
       }
 
-      drawBoard();
+      // 버튼 표시 상태 변경에 따라 모바일 HUD 높이가 달라질 수 있으므로 보드 레이아웃 재동기화
+      requestAnimationFrame(() => updateResponsiveLayout());
     });
 
     socket.on('timerTick', ({ timeLeft }) => {
