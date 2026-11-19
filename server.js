@@ -23,6 +23,7 @@ app.get('/health', (req, res) => {
 
 const BOARD_SIZE = 15;
 const TURN_TIME_LIMIT = 30;
+const COMBO_WINDOW_MS = 8000; // 다중 플레이어 합심 콤보 감지 시간 (8초)
 const rooms = new Map();
 
 const CURSOR_COLORS = [
@@ -200,6 +201,13 @@ function broadcastHeatmapToSpectators(room) {
   });
 }
 
+function clearPendingUndo(room) {
+  if (room.pendingUndo) {
+    room.pendingUndo = null;
+    io.to(room.id).emit('undoCleared');
+  }
+}
+
 function clearRoomTimers(room) {
   if (room.timer) {
     clearInterval(room.timer);
@@ -217,6 +225,7 @@ function startTurnTimer(room) {
 
     if (room.timeLeft <= 0) {
       clearRoomTimers(room);
+      clearPendingUndo(room);
       room.status = 'finished';
       room.heatmapVotes.clear();
       broadcastHeatmapToSpectators(room);
@@ -259,8 +268,13 @@ io.on('connection', (socket) => {
 
   socket.on('joinRoom', ({ roomId, title, nickname, playerName, asSpectator }) => {
     const cleanId = String(roomId || '').trim().slice(0, 20);
-    const rawNick = nickname || playerName || '지나가던고수';
-    const cleanNick = String(rawNick).trim().slice(0, 12) || '지나가던고수';
+    const rawNick = nickname || playerName || '';
+    const cleanNick = String(rawNick).trim().slice(0, 12);
+
+    if (!cleanNick || cleanNick === 'undefined' || cleanNick === 'null') {
+      socket.emit('joinError', '⚠️ 입장하기 전에 닉네임을 먼저 입력해주세요!');
+      return;
+    }
     if (!cleanId) return;
 
     let room = rooms.get(cleanId);
@@ -276,6 +290,7 @@ io.on('connection', (socket) => {
         status: 'waiting',
         lastMove: null,
         winLine: null,
+        pendingUndo: null,
         timeLeft: TURN_TIME_LIMIT,
         timer: null,
         cursors: new Map(),
@@ -359,6 +374,7 @@ io.on('connection', (socket) => {
         room.turn = 'black';
         room.lastMove = null;
         room.winLine = null;
+        room.pendingUndo = null;
         room.heatmapVotes.clear();
         startTurnTimer(room);
         io.to(cleanId).emit('chatMessage', {
@@ -397,7 +413,7 @@ io.on('connection', (socket) => {
     const x = Math.max(-2.5, Math.min(2.5, Number(data.x) || 0));
     const y = Math.max(-2.5, Math.min(2.5, Number(data.y) || 0));
     const laser = Boolean(data.laser);
-    const cleanNick = socket.data.playerName || '익명고수';
+    const cleanNick = socket.data.playerName || '플레이어';
 
     const cursorPayload = {
       id: socket.id,
@@ -427,6 +443,7 @@ io.on('connection', (socket) => {
     });
   });
 
+  // 서로 다른 3명 이상의 플레이어가 8초 내 동일 GIF 발동 시 콤보 공명
   socket.on('sendEmote', ({ emoteId, x, y }) => {
     const roomId = socket.data.roomId;
     const room = rooms.get(roomId);
@@ -447,15 +464,21 @@ io.on('connection', (socket) => {
     });
 
     const now = Date.now();
-    room.emoteComboLog = room.emoteComboLog.filter((item) => now - item.time <= 3000);
+    room.emoteComboLog = room.emoteComboLog.filter((item) => now - item.time <= COMBO_WINDOW_MS);
     room.emoteComboLog.push({ emoteId: idNum, time: now, playerId: socket.id });
 
-    const sameCount = room.emoteComboLog.filter((item) => item.emoteId === idNum).length;
-    if (sameCount >= 3) {
+    const uniquePlayers = new Set(
+      room.emoteComboLog
+        .filter((item) => item.emoteId === idNum)
+        .map((item) => item.playerId)
+    );
+
+    if (uniquePlayers.size >= 3) {
       io.to(roomId).emit('comboResonance', {
         emoteId: idNum,
-        count: sameCount
+        count: uniquePlayers.size
       });
+      room.emoteComboLog = room.emoteComboLog.filter((item) => item.emoteId !== idNum);
     }
   });
 
@@ -479,6 +502,9 @@ io.on('connection', (socket) => {
     broadcastHeatmapToSpectators(room);
   });
 
+  // ==========================================
+  // 실시간 채팅 + "나는 빡빡이다" 감지 팝업 / "오냐" 한 수 무르기
+  // ==========================================
   socket.on('sendChat', (msg) => {
     const roomId = socket.data.roomId;
     const room = rooms.get(roomId);
@@ -496,6 +522,62 @@ io.on('connection', (socket) => {
       cursorColor: socket.data.cursorColor,
       text
     });
+
+    if (room.status !== 'playing') return;
+    const senderPlayer = room.players.find((p) => p.id === socket.id);
+    if (!senderPlayer) return;
+
+    // 1) 상대방 턴일 때 "나는 빡빡이다" 입력 감지 -> 상대 대국자 화면에 안내 팝업 발송
+    if (text === '나는 빡빡이다') {
+      if (
+        room.turn !== senderPlayer.color &&
+        room.history.length > 0 &&
+        room.lastMove &&
+        room.lastMove.color === senderPlayer.color
+      ) {
+        const opponent = room.players.find((p) => p.id !== socket.id);
+        room.pendingUndo = {
+          requesterId: socket.id,
+          moveNumber: room.history.length
+        };
+        io.to(roomId).emit('chatMessage', {
+          system: true,
+          text: `🙏 [${senderPlayer.nickname}]님이 머리를 깎으며 한 수 무르기를 애원합니다! 상대방이 채팅에 "오냐"를 입력하면 1수 무르기가 성사됩니다.`
+        });
+        if (opponent) {
+          io.to(opponent.id).emit('undoRequested', {
+            requesterName: senderPlayer.nickname
+          });
+        }
+      }
+      return;
+    }
+
+    // 2) 무르기 요청 대기 중 상대방이 "오냐" 입력 시 1수 무르기 집행 & 팝업 닫기
+    if (text === '오냐' && room.pendingUndo) {
+      if (
+        senderPlayer.id !== room.pendingUndo.requesterId &&
+        room.turn === senderPlayer.color &&
+        room.history.length === room.pendingUndo.moveNumber &&
+        room.history.length > 0
+      ) {
+        const undoneMove = room.history.pop();
+        room.board[undoneMove.row][undoneMove.col] = null;
+        room.lastMove = room.history.length > 0 ? room.history[room.history.length - 1] : null;
+        room.turn = undoneMove.color;
+        clearPendingUndo(room);
+
+        room.heatmapVotes.clear();
+        broadcastHeatmapToSpectators(room);
+        startTurnTimer(room);
+
+        io.to(roomId).emit('chatMessage', {
+          system: true,
+          text: `✨ 대인배 [${senderPlayer.nickname}]님이 "오냐"를 외쳐 한 수 무르기를 허락했습니다!`
+        });
+        emitRoomState(room);
+      }
+    }
   });
 
   socket.on('swapSides', () => {
@@ -544,6 +626,9 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // 상대방이 무르기를 받아주지 않고 다음 돌을 두면 기존 무르기 요청 및 팝업 초기화
+    clearPendingUndo(room);
+
     room.board[row][col] = player.color;
     const moveNumber = room.history.length + 1;
     room.lastMove = { row, col, color: player.color, moveNumber };
@@ -589,6 +674,7 @@ io.on('connection', (socket) => {
     if (!loser) return;
 
     clearRoomTimers(room);
+    clearPendingUndo(room);
     room.status = 'finished';
     room.heatmapVotes.clear();
     broadcastHeatmapToSpectators(room);
@@ -628,6 +714,7 @@ io.on('connection', (socket) => {
     room.status = 'playing';
     room.lastMove = null;
     room.winLine = null;
+    clearPendingUndo(room);
     room.heatmapVotes.clear();
     broadcastHeatmapToSpectators(room);
 
@@ -666,6 +753,7 @@ io.on('connection', (socket) => {
 
     if (wasPlayer) {
       clearRoomTimers(room);
+      clearPendingUndo(room);
       room.status = 'waiting';
       room.board = createEmptyBoard();
       room.history = [];
@@ -709,5 +797,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`[OMOK DEBUGGED & REFINED PRO] Server running on http://localhost:${PORT}`);
+  console.log(`[OMOK LIVE PRO] Server running on http://localhost:${PORT}`);
 });
